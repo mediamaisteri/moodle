@@ -40,6 +40,34 @@ class auth_plugin_email extends auth_plugin_base {
     }
 
     /**
+     * Return number of days to user password expires.
+     *
+     * If user password does not expire, it should return 0 or a positive value.
+     * If user password is already expired, it should return negative value.
+     *
+     * @param mixed $username username (with system magic quotes)
+     * @return integer
+     */
+    public function password_expire($username) {
+        $result = 0;
+
+        if (!empty($this->config->expirationtime)) {
+            $user = core_user::get_user_by_username($username, 'id,timecreated');
+            $lastpasswordupdatetime = get_user_preferences('auth_email_passwordupdatetime', $user->timecreated, $user->id);
+            $expiretime = $lastpasswordupdatetime + $this->config->expirationtime * DAYSECS;
+            $now = time();
+            $result = ($expiretime - $now) / DAYSECS;
+            if ($expiretime > $now) {
+                $result = ceil($result);
+            } else {
+                $result = floor($result);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Old syntax of class constructor. Deprecated in PHP7.
      *
      * @deprecated since Moodle 3.1
@@ -77,6 +105,7 @@ class auth_plugin_email extends auth_plugin_base {
      */
     function user_update_password($user, $newpassword) {
         $user = get_complete_user_data('id', $user->id);
+        set_user_preference('auth_email_passwordupdatetime', time(), $user->id);
         // This will also update the stored hash to the latest algorithm
         // if the existing hash is using an out-of-date algorithm (or the
         // legacy md5 algorithm).
